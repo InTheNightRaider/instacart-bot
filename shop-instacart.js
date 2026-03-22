@@ -340,6 +340,14 @@ function getFirstUsefulLine(text) {
     .find((line) => line && !isPriceLine(line) && !isStockLine(line) && !isLikelyUiNoiseLine(line)) || '';
 }
 
+function extractProductNameFromAddAriaLabel(ariaLabel) {
+  const label = String(ariaLabel || '').trim();
+  if (!label) return '';
+
+  const withoutAdd = label.replace(/^Add\s+/i, '');
+  return withoutAdd.replace(/^(?:About\s+)?\d+(?:\.\d+)?\s+(?:ct|lb|each|oz|fl oz)\s+/i, '').trim();
+}
+
 function trimListSectionText(bodyText) {
   const startMarkers = ['Edit items', 'Add all to cart'];
   const endMarkers = [
@@ -493,10 +501,12 @@ async function fillSearch(page, term) {
 
 async function waitForSearchResults(page) {
   const selectors = [
+    'button[aria-label^="Add "]',
     '[data-testid*="item-card"]',
     '[data-testid*="product-card"]',
     '[data-testid*="product-tile"]',
     '[data-testid*="item-tile"]',
+    'div:has(button[aria-label^="Add "])',
     'article',
     'li article'
   ];
@@ -512,6 +522,7 @@ async function waitForSearchResults(page) {
 
 async function findResultCards(page) {
   const selectors = [
+    'div:has(button[aria-label^="Add "])',
     '[data-testid*="item-card"]',
     '[data-testid*="product-card"]',
     '[data-testid*="product-tile"]',
@@ -534,10 +545,15 @@ async function findResultCards(page) {
 }
 
 async function getCardTitle(card) {
+  const addAria = await card.locator('button[aria-label^="Add "]').first().getAttribute('aria-label').catch(() => null);
+  const ariaTitle = extractProductNameFromAddAriaLabel(addAria);
+  if (ariaTitle) return ariaTitle;
+
   const preferredLocators = [
     card.locator('h2, h3, h4').first(),
     card.locator('[data-testid*="item-name"]').first(),
-    card.locator('[data-testid*="product-name"]').first()
+    card.locator('[data-testid*="product-name"]').first(),
+    card.locator('div.e-1gh06cz').first()
   ];
 
   for (const locator of preferredLocators) {
@@ -551,6 +567,7 @@ async function getCardTitle(card) {
 
 async function cardHasVisibleAddButton(card) {
   const candidates = [
+    card.locator('button[aria-label^="Add "]').first(),
     card.locator('button:has-text("Add")').first(),
     card.locator('[role="button"]:has-text("Add")').first(),
     card.locator('button:has-text("Add to cart")').first(),
